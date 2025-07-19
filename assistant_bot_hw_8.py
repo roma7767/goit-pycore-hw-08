@@ -2,7 +2,8 @@ import pickle
 from collections import UserDict
 from datetime import datetime, timedelta
 
-# --- Класи ---
+# ---------- КЛАСИ ----------
+
 class Field:
     def __init__(self, value):
         self.value = value
@@ -10,8 +11,10 @@ class Field:
     def __str__(self):
         return str(self.value)
 
+
 class Name(Field):
     pass
+
 
 class Phone(Field):
     def __init__(self, value):
@@ -19,13 +22,15 @@ class Phone(Field):
             raise ValueError("Phone number must contain exactly 10 digits.")
         super().__init__(value)
 
+
 class Birthday(Field):
     def __init__(self, value):
         try:
             datetime.strptime(value, "%d.%m.%Y")
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
-        super().__init__(value)
+        self.value = value
+
 
 class Record:
     def __init__(self, name):
@@ -46,8 +51,8 @@ class Record:
     def edit_phone(self, old_phone, new_phone):
         old = self.find_phone(old_phone)
         if old:
-            self.add_phone(new_phone)
             self.remove_phone(old_phone)
+            self.add_phone(new_phone)
         else:
             raise ValueError("Old phone number not found.")
 
@@ -67,6 +72,7 @@ class Record:
         phones_str = "; ".join(str(p) for p in self.phones)
         bday = f", birthday: {self.show_birthday()}" if self.birthday else ""
         return f"Contact name: {self.name.value}, phones: {phones_str}{bday}"
+
 
 class AddressBook(UserDict):
     def add_record(self, record):
@@ -105,20 +111,22 @@ class AddressBook(UserDict):
     def __str__(self):
         return "\n".join(str(record) for record in self.data.values())
 
-# --- Серіалізація (збереження/завантаження) ---
+# ---------- СЕРІАЛІЗАЦІЯ ----------
 
-def save_to_file(address_book, filename="addressbook.pkl"):
-    with open(filename, "wb") as file:
-        pickle.dump(address_book, file)
+DATA_FILE = "addressbook.pkl"
 
-def load_from_file(filename="addressbook.pkl"):
+def save_data(book):
+    with open(DATA_FILE, "wb") as f:
+        pickle.dump(book, f)
+
+def load_data():
     try:
-        with open(filename, "rb") as file:
-            return pickle.load(file)
+        with open(DATA_FILE, "rb") as f:
+            return pickle.load(f)
     except (FileNotFoundError, EOFError):
         return AddressBook()
 
-# --- Декоратор для обробки помилок ---
+# ---------- ДЕКОРАТОР ДЛЯ ОБРОБКИ ПОМИЛОК ----------
 
 def input_error(func):
     def wrapper(*args, **kwargs):
@@ -128,7 +136,7 @@ def input_error(func):
             return f"Error: {e}"
     return wrapper
 
-# --- Командні функції ---
+# ---------- КОМАНДНІ ФУНКЦІЇ ----------
 
 @input_error
 def add_contact(args, book):
@@ -141,13 +149,26 @@ def add_contact(args, book):
     return f"Contact updated: {record}"
 
 @input_error
-def edit_contact(args, book):
+def change_contact(args, book):
     name, old_phone, new_phone = args
     record = book.find(name)
     if not record:
         return f"No contact with name '{name}' found."
     record.edit_phone(old_phone, new_phone)
     return f"Phone updated for {name}."
+
+@input_error
+def show_phone(args, book):
+    name = args[0]
+    record = book.find(name)
+    if not record:
+        return f"No contact with name '{name}' found."
+    phones = "; ".join(p.value for p in record.phones)
+    return f"{name}'s phones: {phones}"
+
+@input_error
+def show_all(args, book):
+    return str(book) if book.data else "Address book is empty."
 
 @input_error
 def add_birthday(args, book):
@@ -173,48 +194,52 @@ def birthdays(args, book):
         return "No upcoming birthdays this week."
     return "\n".join(f"{name}: {date}" for name, date in upcoming)
 
-@input_error
-def show_all(args, book):
-    return str(book) if book.data else "Address book is empty."
-
-# --- Парсинг команд ---
+# ---------- ПАРСИНГ КОМАНД ----------
 
 def parse_input(user_input):
     parts = user_input.strip().split()
-    command = parts[0]
+    if not parts:
+        return "", []
+    command = parts[0].lower()
     args = parts[1:]
     return command, args
 
-# --- Головна функція ---
+# ---------- ОСНОВНА ФУНКЦІЯ ----------
 
 def main():
-    book = load_from_file()
-    print("👋 Welcome to the assistant bot!")
+    book = load_data()
+    print("Welcome! This is your assistant bot. Enter a command.")
 
     while True:
-        user_input = input("Enter a command: ")
+        user_input = input(">>> ").strip()
+        if not user_input:
+            continue
+
         command, args = parse_input(user_input)
 
-        if command in ("close", "exit"):
-            save_to_file(book)
-            print("Good bye!")
-            break
-        elif command == "hello":
-            print("How can I help you?")
-        elif command == "add":
+        if command == "add":
             print(add_contact(args, book))
+        elif command == "change":
+            print(change_contact(args, book))
+        elif command == "phone":
+            print(show_phone(args, book))
         elif command == "add-birthday":
             print(add_birthday(args, book))
         elif command == "show-birthday":
             print(show_birthday(args, book))
         elif command == "birthdays":
             print(birthdays(args, book))
-        elif command == "all":
+        elif command == "show" and len(args) == 1 and args[0].lower() == "all":
             print(show_all(args, book))
-        elif command == "edit":
-            print(edit_contact(args, book))   
+        elif command in ("exit", "close", "goodbye", "good", "bye"):
+            save_data(book)
+            print("Goodbye!")
+            break
         else:
-            print("Invalid command.")
+            print("Unknown command. Try again.")
+
+# ---------- ЗАПУСК ----------
 
 if __name__ == "__main__":
     main()
+
