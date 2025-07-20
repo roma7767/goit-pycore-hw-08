@@ -49,12 +49,16 @@ class Record:
             raise ValueError("Phone number not found.")
 
     def edit_phone(self, old_phone, new_phone):
-        old = self.find_phone(old_phone)
-        if old:
-            self.remove_phone(old_phone)
-            self.add_phone(new_phone)
-        else:
-            raise ValueError("Old phone number not found.")
+        for phone in self.phones:
+            if phone.value == old_phone:
+                # Перевірити новий номер, якщо невалідний — не видаляти старий
+                try:
+                    new_phone_obj = Phone(new_phone)
+                except ValueError as e:
+                    raise ValueError("Invalid new phone number format.")
+                phone.value = new_phone_obj.value
+                return
+        raise ValueError("Old phone number not found.")
 
     def find_phone(self, phone):
         for p in self.phones:
@@ -229,7 +233,7 @@ def main():
             print(show_birthday(args, book))
         elif command == "birthdays":
             print(birthdays(args, book))
-        elif command == "show" and len(args) == 1 and args[0].lower() == "all":
+        elif command == "all":
             print(show_all(args, book))
         elif command in ("exit", "close", "goodbye", "good", "bye"):
             save_data(book)
